@@ -50,7 +50,7 @@ jobs:
         chmod a+x osmconvert
 
     - name: download osm data
-       run: wget https://planet.openstreetmap.org/pbf/planet-latest.osm.pbf
+      run: wget https://planet.openstreetmap.org/pbf/planet-latest.osm.pbf
       #run: wget http://download.geofabrik.de/south-america/brazil/sul-latest.osm.pbf
 
     - name: extract osm data
