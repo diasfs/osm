@@ -38,32 +38,47 @@ const api = axios.create({
 });
 
 
-const uploadFile = async (file) => {
-    let fd = new FormData();
-    fd.append('file', fs.createReadStream(`${data_folder}/${file}`));
+let chunkSize = 2048*1024;
 
-    await fd.pipe(concat(async data => {
-        await api.post('upload', data, {
-            headers: {
-                ...fd.getHeaders()
-            }
-        })
-            .then((resp) => { 
-                console.log(`${file} uploaded`) 
-                console.log(resp.data);
-            })
-            .catch((error) => {
-                if (error.response) {
-                    //fs.writeFile(`${root_folder}/teste/out-${Date.now()}.html`, error.response.data, function () { });
-                    console.log(error.response.data);
-                } else if (error.request) {
-                    console.error(error.request);
-                } else {
-                    console.error(error.message);
+const uploadFile = async (file) => {
+    let filename = path.join(data_folder, file);
+    let { size } = await fs.promises.stat(filename);
+    console.log(`uploading ${file} sizing: ${size}`);
+
+    let num_chunks = Math.ceil(size/chunkSize);
+    for (let i = 0 ; i < num_chunks; i++) {
+        let is_last = i == num_chunks - 1;
+
+        let start = i * chunkSize;
+        let end = Math.min(i * chunkSize + chunkSize, size);
+
+        let fd = new FormData();
+        fd.append('file', fs.createReadStream(filename, { start, end }),`${file}.part`);
+        fd.append('is_last', is_last);
+    
+        await fd.pipe(concat(async data => {
+            await api.post('upload', data, {
+                headers: {
+                    ...fd.getHeaders()
                 }
-                console.error(`${file} not uploaded ${error.message}`)
-            });
-    }));
+            })
+                .then((resp) => { 
+                    console.log(`${file} uploaded`) 
+                    console.log(resp.data);
+                })
+                .catch((error) => {
+                    if (error.response) {
+                        //fs.writeFile(`${root_folder}/teste/out-${Date.now()}.html`, error.response.data, function () { });
+                        console.log(error.response.data);
+                    } else if (error.request) {
+                        console.error(error.request);
+                    } else {
+                        console.error(error.message);
+                    }
+                    console.error(`${file} not uploaded ${error.message}`)
+                });
+        }));
+    }
 };
 
 
@@ -77,8 +92,13 @@ const uploadFiles = () => {
 };
 
 (async () => {
-
-    await fs.promises.writeFile(path.join(data_folder, 'pois.csv'), pois_csv);
-    await uploadFiles();
+    console.log(path.join(data_folder, 'pois.csv'));
+    try {
+        await fs.promises.writeFile(path.join(data_folder, 'pois.csv'), pois_csv);
+        await uploadFiles();
+        
+    } catch (err) {
+        console.log(err);
+    }
 //    await uploadFile('sul.poi.json');
 })();
